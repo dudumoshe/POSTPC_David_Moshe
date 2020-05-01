@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">POSTPC_David_Moshe</string>
+    <string name="empty_todo">"you can't create an empty TODO item, oh silly!"</string>
+    <string name="todo_done">" is now DONE. BOOM!"</string>
 </resources>
