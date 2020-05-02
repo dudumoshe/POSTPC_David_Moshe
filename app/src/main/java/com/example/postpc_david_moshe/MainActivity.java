@@ -21,11 +21,24 @@ public class MainActivity extends AppCompatActivity implements TodosAdapterClick
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        if(savedInstanceState != null) {
+            todos.clear();
+            int savedTodosSize = savedInstanceState.getInt("todos_size",0);
+            for(int i = 0; i < savedTodosSize; i++) {
+                String description = savedInstanceState.getString("todo_description_" + i);
+                boolean isDone = savedInstanceState.getBoolean("todo_is_done_" + i , false);
+                Todo todo = new Todo(description);
+                todo.isDone = isDone;
+                todos.add(todo);
+            }
+        }
+
         RecyclerView todosRecycler = findViewById(R.id.items_list_recycler_view);
         todosRecycler.setAdapter(adapter);
         todosRecycler.setLayoutManager(
                 new LinearLayoutManager(this, RecyclerView.VERTICAL,false)
         );
+        adapter.setTodos(todos);
         adapter.setTodosAdapterClickCallback(this);
 
         Button addItembutton = findViewById(R.id.add_item_button);
@@ -43,6 +56,17 @@ public class MainActivity extends AppCompatActivity implements TodosAdapterClick
                 adapter.setTodos(todos);
             }
         });
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt("todos_size",todos.size());
+        for(int i = 0; i < todos.size(); i++) {
+            Todo todo = todos.get(i);
+            outState.putString("todo_description_" + i, todo.description);
+            outState.putBoolean("todo_is_done_" + i , todo.isDone);
+        }
     }
 
     @Override
