@@ -1,9 +1,11 @@
 package com.example.postpc_david_moshe;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -69,5 +71,25 @@ public class MainActivity extends AppCompatActivity implements TodosAdapterClick
         adapter.setTodos(todoManager.getTodos());
         Toast.makeText(getApplicationContext(), "TODO " + todoManager.getTodoDescription(position) +
                 getString(R.string.todo_done),Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onLongClickTodo(int position) {
+        final int pos = position;
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                TodoManager todoManager = ((TodoApp)getApplicationContext()).todoManager;
+                todoManager.removeTodo(pos);
+                adapter.setTodos(todoManager.getTodos());
+            }
+        });
+        builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int id) {
+                return;
+            }
+        });
+        builder.setTitle(R.string.approve_delete_ask);
+        builder.show();
     }
 }

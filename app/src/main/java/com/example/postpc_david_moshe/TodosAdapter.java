@@ -43,6 +43,17 @@ public class TodosAdapter extends RecyclerView.Adapter<TodoViewHolder> {
             }
         });
 
+        view.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                if (todosAdapterClickCallback != null) {
+                    todosAdapterClickCallback.onLongClickTodo(todoHolder.getAdapterPosition());
+                    return true;
+                }
+                return false;
+            }
+        });
+
         return todoHolder;
     }
 
@@ -70,4 +81,5 @@ class TodoViewHolder extends RecyclerView.ViewHolder {
 
 interface TodosAdapterClickCallback {
     void onClickTodo(int position);
+    void onLongClickTodo(int position);
 }
