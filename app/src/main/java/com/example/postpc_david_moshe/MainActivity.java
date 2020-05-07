@@ -13,24 +13,17 @@ import android.widget.Toast;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements TodosAdapterClickCallback {
-    ArrayList<Todo> todos = new ArrayList<>();
     TodosAdapter adapter = new TodosAdapter();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        TodoApp todoApp = (TodoApp)getApplicationContext();
 
         if(savedInstanceState != null) {
-            todos.clear();
-            int savedTodosSize = savedInstanceState.getInt("todos_size",0);
-            for(int i = 0; i < savedTodosSize; i++) {
-                String description = savedInstanceState.getString("todo_description_" + i);
-                boolean isDone = savedInstanceState.getBoolean("todo_is_done_" + i , false);
-                Todo todo = new Todo(description);
-                todo.isDone = isDone;
-                todos.add(todo);
-            }
+            EditText insertItemsEditText = findViewById(R.id.insert_items_edit_text);
+            insertItemsEditText.setText(savedInstanceState.getString("todoEditText", ""));
         }
 
         RecyclerView todosRecycler = findViewById(R.id.items_list_recycler_view);
@@ -38,7 +31,7 @@ public class MainActivity extends AppCompatActivity implements TodosAdapterClick
         todosRecycler.setLayoutManager(
                 new LinearLayoutManager(this, RecyclerView.VERTICAL,false)
         );
-        adapter.setTodos(todos);
+        adapter.setTodos(todoApp.todoManager.getTodos());
         adapter.setTodosAdapterClickCallback(this);
 
         Button addItembutton = findViewById(R.id.add_item_button);
@@ -52,33 +45,29 @@ public class MainActivity extends AppCompatActivity implements TodosAdapterClick
                     Toast.makeText(getApplicationContext(),getString(R.string.empty_todo), Toast.LENGTH_SHORT).show();
                     return;
                 }
-                todos.add(new Todo(todoDescription));
-                adapter.setTodos(todos);
+                TodoManager todoManager = ((TodoApp)getApplicationContext()).todoManager;
+                todoManager.addTodo(new Todo(todoDescription));
+                adapter.setTodos(todoManager.getTodos());
             }
         });
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
+        EditText insertItemsEditText = findViewById(R.id.insert_items_edit_text);
         super.onSaveInstanceState(outState);
-        outState.putInt("todos_size",todos.size());
-        for(int i = 0; i < todos.size(); i++) {
-            Todo todo = todos.get(i);
-            outState.putString("todo_description_" + i, todo.description);
-            outState.putBoolean("todo_is_done_" + i , todo.isDone);
-        }
+        outState.putString("todoEditText", insertItemsEditText.getText().toString());
     }
 
     @Override
     public void onClickTodo(int position) {
-        Todo todo = todos.get(position);
-        if (todo.isDone) {
+        TodoManager todoManager = ((TodoApp)getApplicationContext()).todoManager;
+        if (todoManager.isDone(position)) {
             return;
         }
-        todo.setAsDone();
-        todos.set(position, todo);
-        adapter.setTodos(todos);
-        Toast.makeText(getApplicationContext(), "TODO " + todo.description +
+        todoManager.setAsDone(position);
+        adapter.setTodos(todoManager.getTodos());
+        Toast.makeText(getApplicationContext(), "TODO " + todoManager.getTodoDescription(position) +
                 getString(R.string.todo_done),Toast.LENGTH_SHORT).show();
     }
 }
