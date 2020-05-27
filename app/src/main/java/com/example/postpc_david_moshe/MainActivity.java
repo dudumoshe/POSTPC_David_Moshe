@@ -1,27 +1,24 @@
 package com.example.postpc_david_moshe;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import java.util.ArrayList;
-
-public class MainActivity extends AppCompatActivity implements TodosAdapterClickCallback {
+public class MainActivity extends AppCompatActivity implements TodosAdapterClickCallback, OnTodosChanges {
     TodosAdapter adapter = new TodosAdapter();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        TodoApp todoApp = (TodoApp)getApplicationContext();
 
         if(savedInstanceState != null) {
             EditText insertItemsEditText = findViewById(R.id.insert_items_edit_text);
@@ -33,8 +30,8 @@ public class MainActivity extends AppCompatActivity implements TodosAdapterClick
         todosRecycler.setLayoutManager(
                 new LinearLayoutManager(this, RecyclerView.VERTICAL,false)
         );
-        adapter.setTodos(todoApp.todoManager.getTodos());
         adapter.setTodosAdapterClickCallback(this);
+        updateTodosContent();
 
         Button addItembutton = findViewById(R.id.add_item_button);
         addItembutton.setOnClickListener(new View.OnClickListener() {
@@ -48,10 +45,30 @@ public class MainActivity extends AppCompatActivity implements TodosAdapterClick
                     return;
                 }
                 TodoManager todoManager = ((TodoApp)getApplicationContext()).todoManager;
-                todoManager.addTodo(new Todo(todoDescription));
+                todoManager.addTodo(todoDescription);
                 adapter.setTodos(todoManager.getTodos());
             }
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateTodosContent();
+        TodoApp todoApp = (TodoApp)getApplicationContext();
+        todoApp.listenTodosChange("MainActivity", this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        TodoApp todoApp = (TodoApp)getApplicationContext();
+        todoApp.stopListenTodosChange("MainActivity");
+    }
+
+    public void updateTodosContent() {
+        TodoApp todoApp = (TodoApp)getApplicationContext();
+        adapter.setTodos(todoApp.todoManager.getTodos());
     }
 
     @Override
@@ -62,34 +79,24 @@ public class MainActivity extends AppCompatActivity implements TodosAdapterClick
     }
 
     @Override
-    public void onClickTodo(int position) {
+    public void onClickTodo(int ID) {
         TodoManager todoManager = ((TodoApp)getApplicationContext()).todoManager;
-        if (todoManager.isDone(position)) {
-            return;
+        Log.d("Main Activity", "Editing todo with ID " + ID);
+        if (todoManager.isDone(ID)) {
+            Intent intent = new Intent(this, EditInactiveTodo.class);
+            intent.putExtra("TodoID", ID);
+            startActivity(intent);
+        } else {
+            Intent intent = new Intent(this, EditActiveTodo.class);
+            intent.putExtra("TodoID", ID);
+            startActivity(intent);
         }
-        todoManager.setAsDone(position);
-        adapter.setTodos(todoManager.getTodos());
-        Toast.makeText(getApplicationContext(), "TODO " + todoManager.getTodoDescription(position) +
-                getString(R.string.todo_done),Toast.LENGTH_SHORT).show();
     }
 
     @Override
-    public void onLongClickTodo(int position) {
-        final int pos = position;
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int id) {
-                TodoManager todoManager = ((TodoApp)getApplicationContext()).todoManager;
-                todoManager.removeTodo(pos);
-                adapter.setTodos(todoManager.getTodos());
-            }
-        });
-        builder.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int id) {
-                return;
-            }
-        });
-        builder.setTitle(R.string.approve_delete_ask);
-        builder.show();
+    public void todosHaveBeenChanged() {
+        updateTodosContent();
+        Toast.makeText(getApplicationContext(),"Todos Updated! check it out",
+                Toast.LENGTH_SHORT).show();
     }
 }

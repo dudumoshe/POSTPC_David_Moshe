@@ -4,7 +4,6 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.CheckBox;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -38,19 +37,8 @@ public class TodosAdapter extends RecyclerView.Adapter<TodoViewHolder> {
             @Override
             public void onClick(View v) {
                 if (todosAdapterClickCallback != null) {
-                    todosAdapterClickCallback.onClickTodo(todoHolder.getAdapterPosition());
+                    todosAdapterClickCallback.onClickTodo(todos.get(todoHolder.getAdapterPosition()).getId());
                 }
-            }
-        });
-
-        view.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                if (todosAdapterClickCallback != null) {
-                    todosAdapterClickCallback.onLongClickTodo(todoHolder.getAdapterPosition());
-                    return true;
-                }
-                return false;
             }
         });
 
@@ -60,8 +48,8 @@ public class TodosAdapter extends RecyclerView.Adapter<TodoViewHolder> {
     @Override
     public void onBindViewHolder(@NonNull TodoViewHolder holder, int position) {
         Todo todo = this.todos.get(position);
-        holder.todo.setText(todo.description);
-        holder.todo.setAlpha(todo.isDone ? 0.3f : 1.0f);
+        holder.todo.setText(todo.todoDescription());
+        holder.todo.setAlpha(todo.checkIfDone() ? 0.3f : 1.0f);
     }
 
     @Override
@@ -80,6 +68,5 @@ class TodoViewHolder extends RecyclerView.ViewHolder {
 }
 
 interface TodosAdapterClickCallback {
-    void onClickTodo(int position);
-    void onLongClickTodo(int position);
+    void onClickTodo(int ID);
 }

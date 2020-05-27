@@ -1,78 +1,204 @@
 package com.example.postpc_david_moshe;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 
-import com.google.gson.Gson;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.firestore.EventListener;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.ArrayList;
 
-import static android.content.Context.MODE_PRIVATE;
 
 public class TodoManager {
     ArrayList<Todo> todos;
-    SharedPreferences sp;
-    Gson gson;
+    OnTodosChanges onTodosChanges;
+    private int currentID = 0;
+    FirebaseFirestore db;
 
-    public TodoManager(Context context) {
+    public TodoManager(OnTodosChanges onTodosChanges) {
         this.todos = new ArrayList<>();
-        this.sp = context.getSharedPreferences("todosList", MODE_PRIVATE);
-        this.gson = new Gson();
+        this.onTodosChanges = onTodosChanges;
+        this.db = FirebaseFirestore.getInstance();
 
-        int savedTodoListSize = sp.getInt("todo_list_size", 0);
-        Log.d("TodoManager", "The current size is of todos " + savedTodoListSize + ".");
-        for(int i = 0; i < savedTodoListSize; i++) {
-            String todoJson = sp.getString("todo_item_" + i, null);
-            if (todoJson != null) {
-                todos.add(gson.fromJson(todoJson, Todo.class));
+        updateTodoListFromFireStore();
+        listenTodosChangesInFireStore();
+    }
+
+    private void updateTodoListFromFireStore() {
+        db.collection("todos_list").get()
+                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                if(task.isSuccessful() && task.getResult() != null) {
+                    todos.clear();
+                    int maxID = 0;
+                    for(QueryDocumentSnapshot document: task.getResult()) {
+                        Todo todo = document.toObject(Todo.class);
+                        if (todo.getId() > maxID) {
+                            maxID = todo.getId();
+                        }
+                        todos.add(todo);
+                    }
+                    currentID = maxID + 1;
+                    onTodosChanges.todosHaveBeenChanged();
+                    Log.d("TodoManager", "Loaded todos from firebase, current ID is " + currentID);
+                } else {
+                    Log.d("TodoManager", "Couldn't find todos on firebase");
+                }
             }
-        }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                Log.d("TodoManager", "Couldn't find todos on firebase");
+            }
+        });
+    }
+
+    private void listenTodosChangesInFireStore() {
+        db.collection("todos_list").addSnapshotListener(new EventListener<QuerySnapshot>() {
+            @Override
+            public void onEvent(@Nullable QuerySnapshot queryDocumentSnapshots, @Nullable FirebaseFirestoreException e) {
+                if (e != null || queryDocumentSnapshots == null) {
+                    Log.d("TodoManager", "Couldn't find todos on firebase on listener");
+                    return;
+                }
+                todos.clear();
+                int maxID = 0;
+                for(QueryDocumentSnapshot document: queryDocumentSnapshots) {
+                    Todo todo = document.toObject(Todo.class);
+                    if (todo.getId() > maxID) {
+                        maxID = todo.getId();
+                    }
+                    todos.add(todo);
+                }
+                currentID = maxID + 1;
+                onTodosChanges.todosHaveBeenChanged();
+            }
+        });
+    }
+
+    private void updateTodoOnFireStore(Todo todo) {
+        db.collection("todos_list").document("Todo_num" + todo.getId()).set(todo)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void aVoid) {
+                Log.d("TodoManager", "added todo to FireStore successfully");
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                Log.d("TodoManager", "couldn't add todo to FireStore");
+            }
+        });
+    }
+
+    private void deleteTodoFromFireStore(int ID) {
+        db.collection("todos_list").document("Todo_num" + ID).delete()
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void aVoid) {
+                Log.d("TodoManager", "deleted todo from FireStore successfully");
+            }
+        }).addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                Log.d("TodoManager", "couldn't delete todo from FireStore");
+            }
+        });
     }
 
     public ArrayList<Todo> getTodos() {
         return todos;
     }
 
-    public void addTodo(Todo todo) {
-        todos.add(todo);
-        sp.edit()
-          .putInt("todo_list_size", todos.size())
-          .putString("todo_item_" + (todos.size() - 1), gson.toJson(todo))
-          .apply();
+    public Todo getTodoByID(int ID) {
+        int index = getItemIndex(ID);
+        if (index == -1) {
+            Log.e("TodoManager", "couldn't find todo by ID");
+            return null;
+        }
+        return todos.get(index);
     }
 
-    public Todo removeTodo(int index) {
+    public void addTodo(String description) {
+        Todo todo = new Todo(description, currentID);
+        currentID++;
+        todos.add(todo);
+        updateTodoOnFireStore(todo);
+    }
+
+    public Todo removeTodo(int ID) {
+        int index = getItemIndex(ID);
+        if (index == -1) {
+            Log.e("TodoManager", "couldn't find todo by ID");
+            return null;
+        }
         Todo removedTodo = todos.remove(index);
-        saveCurrentTodosListInMemory();
+        deleteTodoFromFireStore(ID);
         return removedTodo;
     }
 
-    public boolean isDone(int index) {
-        return todos.get(index).isDone;
-    }
-
-    public String getTodoDescription(int index) {
-        return todos.get(index).description;
-    }
-
-    public void setAsDone(int index) {
-        todos.get(index).isDone = true;
-        sp.edit()
-          .putString("todo_item_" + index, gson.toJson(todos.get(index)))
-          .apply();
-    }
-
-    private void saveCurrentTodosListInMemory() {
-        int savedTodoListSize = sp.getInt("todo_list_size", 0);
-        SharedPreferences.Editor editor = sp.edit();
-        for (int i = 0; i < savedTodoListSize; i++) {
-            editor.remove("todo_item_" + i);
+    public boolean isDone(int ID) {
+        int index = getItemIndex(ID);
+        if (index == -1) {
+            Log.e("TodoManager", "couldn't find todo by ID");
+            return false;
         }
-        editor.putInt("todo_list_size", todos.size());
-        for (int i = 0; i < todos.size(); i++) {
-            editor.putString("todo_item_" + i, gson.toJson(this.todos.get(i)));
-        }
-        editor.apply();
+        return todos.get(index).checkIfDone();
     }
+
+    public String getTodoDescription(int ID) {
+        int index = getItemIndex(ID);
+        if (index == -1) {
+            Log.e("TodoManager", "couldn't find todo by ID");
+            return "";
+        }
+        return todos.get(index).todoDescription();
+    }
+
+    public void setDone(int ID, boolean isDone) {
+        int index = getItemIndex(ID);
+        if (index == -1) {
+            Log.e("TodoManager", "couldn't find todo by ID");
+            return;
+        }
+        Todo todo = todos.get(index);
+        todo.setTodoStatus(isDone);
+        todos.set(index, todo);
+        updateTodoOnFireStore(todo);
+    }
+
+    public void setDescription(int ID, String description) {
+        int index = getItemIndex(ID);
+        if (index == -1) {
+            Log.e("TodoManager", "couldn't find todo by ID");
+            return;
+        }
+        Todo todo = todos.get(index);
+        todo.setTodoDescription(description);
+        todos.set(index, todo);
+        updateTodoOnFireStore(todo);
+    }
+
+    private int getItemIndex(int ID) {
+        for (int index = 0; index < todos.size(); index++) {
+            if (todos.get(index).getId() == ID) {
+                return index;
+            }
+        }
+        return -1;
+    }
+}
+
+interface OnTodosChanges {
+    public void todosHaveBeenChanged();
 }
